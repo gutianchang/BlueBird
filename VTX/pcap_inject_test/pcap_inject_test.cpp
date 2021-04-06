@@ -18,6 +18,7 @@
 #include <arpa/inet.h>
 #include <linux/ip.h>
 #include <linux/udp.h>
+#include <unistd.h>
 
 /* Defined in include/linux/ieee80211.h */
 struct ieee80211_hdr {
@@ -45,7 +46,7 @@ const uint8_t mac[6] = { 0x01, 0x23, 0x45, 0x67, 0x89, 0xab };
  *
  */
 const char * to = "255.255.255.255";
-const char * from = "169.254.1.1";
+const char * from = "178.18.128.30";
 
 /**
  * Radiotap is a protocol of sorts that is used to convey information about the
@@ -83,9 +84,7 @@ static const uint8_t u8aRadiotapHeader[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // <-- timestamp
 
 
-// Setting the IEEE80211_RADIOTAP_F_FCS bit actually indicates to the kernel that the frame already contains the checksum.
-// If you want to avoid the need to calculate it yourself, you should not set that bit.
-
+    //   TODO:
 
     /**
      * This is the first set of flags, and we've set the bit corresponding to
@@ -130,7 +129,7 @@ const uint8_t ipllc[8] = { 0xaa, 0xaa, 0x03, 0x00, 0x00, 0x00, 0x08, 0x00 };
 uint16_t inet_csum(const void *buf, size_t hdr_len);
 
 int main(void) {
-
+    printf("start pcap inject \r\n");
     /* The parts of our packet */
     uint8_t *rt; /* radiotap */
     struct ieee80211_hdr *hdr;
@@ -150,7 +149,8 @@ int main(void) {
     pcap_t *ppcap;
     
     /* Total buffer size (note the 0 bytes of data and the 4 bytes of FCS */
-    sz = sizeof(u8aRadiotapHeader) + sizeof(struct ieee80211_hdr) + sizeof(ipllc) + sizeof(struct iphdr) + sizeof(struct udphdr) + 0 /* data */ + 4 /* FCS */;
+    // sz = sizeof(u8aRadiotapHeader) + sizeof(struct ieee80211_hdr) + sizeof(ipllc) + sizeof(struct iphdr) + sizeof(struct udphdr) + 0 /* data */ + 4 /* FCS */;
+    sz = sizeof(u8aRadiotapHeader) + sizeof(struct ieee80211_hdr) + sizeof(ipllc) + sizeof(struct iphdr) + sizeof(struct udphdr) + 5 /* data */ + 4 /* FCS */;
     buf = (uint8_t *) malloc(sz);
 
     /* Put our pointers in the right place */
@@ -160,6 +160,11 @@ int main(void) {
     ip = (struct iphdr *) (llc+sizeof(ipllc));
     udp = (struct udphdr *) (ip+1);
     data = (uint8_t *) (udp+1);
+    *(data) = 'H';
+    *(data+1) = 'E';
+    *(data+2) = 'L';
+    *(data+3) = 'L';
+    *(data+4) = 'O';
 
     /* The radiotap header has been explained already */
     memcpy(rt, u8aRadiotapHeader, sizeof(u8aRadiotapHeader));
@@ -255,29 +260,35 @@ int main(void) {
     udp->len         = htons(sizeof(struct udphdr) + 0 /* data */);
     udp->check     = 0;
 
-    /**
-     * Finally, we have the packet and are ready to inject it.
-     * First, we open the interface we want to inject on using pcap.
-     */
-    ppcap = pcap_open_live("wlan0", 800, 1, 20, errbuf);
+    int n = 0;
 
-    if (ppcap == NULL) {
-        printf("Could not open interface wlan0 for packet injection: %s", errbuf);
-        return 2;
-    }
+    while(1){
+        printf("n = %d\r\n",n);
+            /**
+             * Finally, we have the packet and are ready to inject it.
+             * First, we open the interface we want to inject on using pcap.
+             */
+            ppcap = pcap_open_live("wlx70f11c50a61d", 800, 1, 20, errbuf);
 
-    /**
-     * Then we send the packet and clean up after ourselves
-     */
-    if (pcap_sendpacket(ppcap, buf, sz) == 0) {
-        pcap_close(ppcap);
-        return 0;
-    }
+            if (ppcap == NULL) {
+                printf("Could not open interface wlx70f11c50a61d for packet injection: %s\r\n", errbuf);
+                return 2;
+            }
+
+            /**
+             * Then we send the packet and clean up after ourselves
+             */
+            if (pcap_sendpacket(ppcap, buf, sz) == 0) {
+                pcap_close(ppcap);
+                // return 0;
+            }
+            sleep(0.01);n++;
+        }
 
     /**
      * If something went wrong, let's let our user know
      */
-    pcap_perror(ppcap, "Failed to inject packet");
+    pcap_perror(ppcap, "Failed to inject packet\r\n");
     pcap_close(ppcap);
     return 1;
 }
