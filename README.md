@@ -1,15 +1,6 @@
 # BlueBird
 
-An open source flight controller.
+An open source quadrotor.
 
-* Based on TI TMS320F28379D.
-
-* A hardware PCB design included.
-
-
-## Software Partition
-
-
-## Hardware Partition
-
+* BlueBird flight controller based on pixhawk4 mini hardware.
 
